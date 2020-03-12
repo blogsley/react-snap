@@ -619,6 +619,23 @@ const saveAsHtml = async ({ page, filePath, options, route, fs }) => {
   }
 };
 
+const saveState = ({ state, filePath, options, route, fs }) => {
+  console.log('state')
+  console.log(state)
+  const stateJSON = JSON.stringify(state);
+  let statePath;
+
+  if (route.endsWith(".html")) {
+  } else if (route === "/") {
+    statePath = `${filePath}index.json`;
+    fs.writeFileSync(statePath, stateJSON);
+  } else {
+    fs.writeFileSync(path.join(filePath, "index.json"), stateJSON);
+  }
+  console.log(route)
+  console.log(statePath)
+};
+
 const saveAsPng = ({ page, filePath, options, route }) => {
   mkdirp.sync(path.dirname(filePath));
   let screenshotPath;
@@ -782,7 +799,7 @@ const run = async (userOptions, { fs } = { fs: nativeFs }) => {
       }
       if (options.asyncScriptTags) await asyncScriptTags({ page });
 
-      await page.evaluate(ajaxCache => {
+      const state = await page.evaluate(ajaxCache => {
         const snapEscape = (() => {
           const UNSAFE_CHARS_REGEXP = /[<>\/\u2028\u2029]/g;
           // Mapping of unsafe HTML and invalid JavaScript line terminator chars to their
@@ -814,6 +831,7 @@ const run = async (userOptions, { fs } = { fs: nativeFs }) => {
           (state = window.snapSaveState()) &&
           Object.keys(state).length !== 0
         ) {
+          // scriptTagText += `window["snapState"]=${snapStringify(state)};`
           scriptTagText += Object.keys(state)
             .map(key => `window["${key}"]=${snapStringify(state[key])};`)
             .join("");
@@ -825,6 +843,7 @@ const run = async (userOptions, { fs } = { fs: nativeFs }) => {
           const firstScript = Array.from(document.scripts)[0];
           firstScript.parentNode.insertBefore(scriptTag, firstScript);
         }
+        return state;
       }, ajaxCache[route]);
       delete ajaxCache[route];
       if (options.fixInsertRule) await fixInsertRule({ page });
@@ -844,6 +863,8 @@ const run = async (userOptions, { fs } = { fs: nativeFs }) => {
           console.log(`💬  in browser redirect (${newPath})`);
           addToQueue(newRoute);
         }
+        saveState({ state, filePath, options, route, fs });
+
       } else if (options.saveAs === "png") {
         await saveAsPng({ page, filePath, options, route, fs });
       } else if (options.saveAs === "jpeg") {
